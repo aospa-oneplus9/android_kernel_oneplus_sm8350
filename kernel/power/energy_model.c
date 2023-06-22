@@ -123,7 +123,7 @@ static int __init em_debug_init(void)
 			break;
 		}
 
-		em_debug_create_pd(pd, cpu);
+		em_debug_create_pd(get_cpu_device(cpu));
 		cpumask_andnot(&span, &span, to_cpumask(pd->cpus));
 	}
 
