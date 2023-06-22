@@ -498,7 +498,7 @@ devfreq_cooling_em_register(struct devfreq *df,
 
 	dev = df->dev.parent;
 
-	ret = dev_pm_opp_of_register_em(dev, NULL);
+	ret = dev_pm_opp_of_register_em(dev);
 	if (ret)
 		dev_dbg(dev, "Unable to register EM for devfreq cooling device (%d)\n",
 			ret);
