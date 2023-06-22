@@ -589,7 +589,7 @@ __cpufreq_cooling_register(struct device_node *np,
 		cdev = ERR_PTR(ret);
 		goto free_table;
 	}
-	cpufreq_cdev->id = policy->cpu;
+	cpufreq_cdev->id = ret;
 
 	snprintf(dev_name, sizeof(dev_name), "thermal-cpufreq-%d",
 		 cpufreq_cdev->id);
