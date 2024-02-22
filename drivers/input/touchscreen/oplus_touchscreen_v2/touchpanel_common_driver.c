@@ -29,17 +29,9 @@
 #include "touch_comon_api/touch_comon_api.h"
 #include "touchpanel_healthinfo/touchpanel_healthinfo.h"
 #ifndef CONFIG_REMOVE_OPLUS_FUNCTION
-#ifdef CONFIG_TOUCHPANEL_MTK_PLATFORM
-#include<mt-plat/mtk_boot_common.h>
-#else
 #include <soc/oplus/system/boot_mode.h>
 #endif
-#endif
 
-#if IS_ENABLED(CONFIG_FB)
-#include <linux/fb.h>
-#include <linux/notifier.h>
-#endif
 #if IS_ENABLED(CONFIG_DRM_OPLUS_PANEL_NOTIFY)
 #include <linux/msm_drm_notify.h>
 #elif IS_ENABLED(CONFIG_DRM_PANEL_NOTIFY)
@@ -48,25 +40,11 @@
 #include <drm/drm_panel.h>
 #elif IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 #include <linux/msm_drm_notify.h>
-#elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
-#include <linux/mtk_panel_ext.h>
-#include <linux/mtk_disp_notify.h>
 #endif
 
 #if IS_ENABLED(CONFIG_TOUCHPANEL_NOTIFY)
 #include "touchpanel_notify/touchpanel_event_notify.h"
 #endif
-
-/*******Part0:LOG TAG Declear************************/
-#if defined(CONFIG_TOUCHPANEL_MTK_PLATFORM) && defined(CONFIG_TOUCHIRQ_UPDATE_QOS)
-#error CONFIG_TOUCHPANEL_MTK_PLATFORM and CONFIG_TOUCHIRQ_UPDATE_QOS
-#error can not defined same time
-#endif
-
-#define TP_ALL_GESTURE_SUPPORT \
-	(ts->black_gesture_support || ts->fingerprint_underscreen_support)
-#define TP_ALL_GESTURE_ENABLE  \
-	((ts->gesture_enable & 0x01) == 1 || ts->fp_enable)
 
 /*******Part1:Global variables Area********************/
 struct touchpanel_data *g_tp[TP_SUPPORT_MAX] = {NULL};
@@ -86,15 +64,12 @@ static void lcd_trigger_load_tp_fw(struct work_struct *work);
 void esd_handle_switch(struct esd_information *esd_info, bool flag);
 void tp_delta_read_triggered_by_key(int index);
 
-#if IS_ENABLED(CONFIG_FB) || IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
+#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 static int fb_notifier_callback(struct notifier_block *self,
 				unsigned long event, void *data);
 #elif IS_ENABLED(CONFIG_DRM_PANEL_NOTIFY)
 static void ts_panel_notifier_callback(enum panel_event_notifier_tag tag,
 		 struct panel_event_notification *event, void *client_data);
-#elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
-static int ts_mtk_drm_notifier_callback(struct notifier_block *nb,
-                unsigned long event, void *data);
 #endif
 
 static void tp_touch_release(struct touchpanel_data *ts);
@@ -115,32 +90,16 @@ static int tp_gesture_enable_flag(unsigned int tp_index);
 extern int (*tp_gesture_enable_notifier)(unsigned int tp_index);
 #endif
 
-#ifdef CONFIG_TOUCHPANEL_MTK_PLATFORM
-#ifndef CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY
-extern enum boot_mode_t get_boot_mode(void);
-#endif
-#else
 extern int get_boot_mode(void);
-#endif
 
-#ifdef CONFIG_TOUCHPANEL_MTK_PLATFORM
-#ifndef CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY
-extern void primary_display_esd_check_enable(int enable);
-#endif
-#endif
 void display_esd_check_enable_bytouchpanel(bool enable);
 
 /*******Part3:Function  Area********************************/
 bool inline is_ftm_boot_mode(struct touchpanel_data *ts)
 {
 #ifndef CONFIG_REMOVE_OPLUS_FUNCTION
-#ifdef CONFIG_TOUCHPANEL_MTK_PLATFORM
-
-	if ((ts->boot_mode == META_BOOT || ts->boot_mode == FACTORY_BOOT))
-#else
 	if ((ts->boot_mode == MSM_BOOT_MODE__FACTORY
 	     || ts->boot_mode == MSM_BOOT_MODE__RF || ts->boot_mode == MSM_BOOT_MODE__WLAN))
-#endif
 	{
 		return true;
 	}
@@ -492,6 +451,7 @@ int sec_double_tap(struct gesture_info *gesture)
 static void tp_gesture_handle(struct touchpanel_data *ts)
 {
 	struct gesture_info gesture_info_temp;
+	unsigned int gesture_code;
 
 	if (((!ts->ts_ops->get_gesture_info) && (!ts->enable_point_auto_change))
 	    || ((!ts->ts_ops->get_gesture_info_auto) && ts->enable_point_auto_change)) {
@@ -556,40 +516,126 @@ static void tp_gesture_handle(struct touchpanel_data *ts)
 
 #endif /* end of CONFIG_OPLUS_TP_APK*/
 
-	if (gesture_info_temp.gesture_type == DOU_TAP
-			&& CHK_BIT(ts->gesture_enable_indep, (1 << gesture_info_temp.gesture_type))) {
-		tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+	switch(gesture_info_temp.gesture_type) {
+		case DOU_TAP:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
 			  &gesture_info_temp, sizeof(struct gesture_info), \
 			  sizeof(struct gesture_info));
-		input_report_key(ts->input_dev, KEY_WAKEUP, 1);
-		input_sync(ts->input_dev);
-		input_report_key(ts->input_dev, KEY_WAKEUP, 0);
-		input_sync(ts->input_dev);
-
-	} else if (gesture_info_temp.gesture_type != UNKOWN_GESTURE
-		&& gesture_info_temp.gesture_type != FINGER_PRINTDOWN
-		&& gesture_info_temp.gesture_type != FRINGER_PRINTUP
-		&& CHK_BIT(ts->gesture_enable_indep, (1 << gesture_info_temp.gesture_type))) {
-		tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			gesture_code = KEY_WAKEUP;
+			break;
+		case FINGER_PRINTDOWN:
+			ts->fp_info.touch_state = 1;
+			ts->fp_info.x = gesture_info_temp.Point_start.x;
+			ts->fp_info.y = gesture_info_temp.Point_start.y;
+			TP_INFO(ts->tp_index, "screen off down : (%d, %d)\n", ts->fp_info.x, ts->fp_info.y);
+			touch_call_notifier_fp(&ts->fp_info);
+			break;
+		case FRINGER_PRINTUP:
+			ts->fp_info.touch_state = 0;
+			ts->fp_info.x = gesture_info_temp.Point_start.x;
+			ts->fp_info.y = gesture_info_temp.Point_start.y;
+			TP_INFO(ts->tp_index, "screen off up : (%d, %d)\n", ts->fp_info.x, ts->fp_info.y);
+			touch_call_notifier_fp(&ts->fp_info);
+			break;
+		case UP_VEE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
 			  &gesture_info_temp, sizeof(struct gesture_info), \
 			  sizeof(struct gesture_info));
-		input_report_key(ts->input_dev, KEY_GESTURE_START + gesture_info_temp.gesture_type, 1);
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case DOWN_VEE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case LEFT_VEE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case RIGHT_VEE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case CIRCLE_GESTURE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case DOU_SWIP:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case LEFT2RIGHT_SWIP:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case RIGHT2LEFT_SWIP:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case UP2DOWN_SWIP:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case DOWN2UP_SWIP:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case M_GESTRUE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case W_GESTURE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case SINGLE_TAP:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case HEART:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		case S_GESTURE:
+			tp_memcpy(&ts->gesture, sizeof(ts->gesture), \
+			  &gesture_info_temp, sizeof(struct gesture_info), \
+			  sizeof(struct gesture_info));
+			gesture_code = KEY_GESTURE_START + gesture_info_temp.gesture_type;
+			break;
+		default:
+			gesture_code = KEY_UNKNOWN;
+			break;
+	}
+	if (gesture_code != KEY_UNKNOWN) {
+		input_report_key(ts->input_dev, gesture_code, 1);
 		input_sync(ts->input_dev);
-		input_report_key(ts->input_dev, KEY_GESTURE_START + gesture_info_temp.gesture_type, 0);
+		input_report_key(ts->input_dev, gesture_code, 0);
 		input_sync(ts->input_dev);
-
-	} else if (gesture_info_temp.gesture_type == FINGER_PRINTDOWN) {
-		ts->fp_info.touch_state = 1;
-		ts->fp_info.x = gesture_info_temp.Point_start.x;
-		ts->fp_info.y = gesture_info_temp.Point_start.y;
-		TP_INFO(ts->tp_index, "screen off down : (%d, %d)\n", ts->fp_info.x, ts->fp_info.y);
-		touch_call_notifier_fp(&ts->fp_info);
-	} else if (gesture_info_temp.gesture_type == FRINGER_PRINTUP) {
-		ts->fp_info.touch_state = 0;
-		ts->fp_info.x = gesture_info_temp.Point_start.x;
-		ts->fp_info.y = gesture_info_temp.Point_start.y;
-		TP_INFO(ts->tp_index, "screen off up : (%d, %d)\n", ts->fp_info.x, ts->fp_info.y);
-		touch_call_notifier_fp(&ts->fp_info);
 	}
 }
 
@@ -1056,11 +1102,6 @@ static void tp_fw_update_work(struct work_struct *work)
 	}
 
 	display_esd_check_enable_bytouchpanel(0);
-#ifdef CONFIG_TOUCHPANEL_MTK_PLATFORM
-#ifndef CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY
-	primary_display_esd_check_enable(0); /*avoid rst pulled to low while updating*/
-#endif
-#endif
 
 	if (ts->ts_ops->fw_update) {
 		do {
@@ -1159,11 +1200,6 @@ EXIT:
 	ts->loading_fw = false;
 
 	display_esd_check_enable_bytouchpanel(1);
-#ifdef CONFIG_TOUCHPANEL_MTK_PLATFORM
-#ifndef CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY
-	primary_display_esd_check_enable(1); /*avoid rst pulled to low while updating*/
-#endif
-#endif
 
 	if (ts->esd_handle_support) {
 		esd_handle_switch(&ts->esd_info, true);
@@ -2963,13 +2999,6 @@ int register_common_touch_device(struct touchpanel_data *pdata)
 		ts->notifier_cookie = cookie;
 	}
 
-#elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
-	ts->disp_notifier.notifier_call = ts_mtk_drm_notifier_callback;
-	if (mtk_disp_notifier_register("Oplus_touch_v2", &ts->disp_notifier)) {
-		TP_INFO(ts->tp_index, "Failed to register disp notifier client!!\n");
-		goto err_check_functionality_failed;
-	}
-
 #elif IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 	ts->fb_notif.notifier_call = fb_notifier_callback;
 	ret = msm_drm_register_client(&ts->fb_notif);
@@ -2979,16 +3008,7 @@ int register_common_touch_device(struct touchpanel_data *pdata)
 		goto err_check_functionality_failed;
 	}
 
-#elif IS_ENABLED(CONFIG_FB)
-	ts->fb_notif.notifier_call = fb_notifier_callback;
-	ret = fb_register_client(&ts->fb_notif);
-
-	if (ret) {
-		TP_INFO(ts->tp_index, "Unable to register fb_notifier: %d\n", ret);
-		goto err_check_functionality_failed;
-	}
-
-#endif/*CONFIG_FB*/
+#endif/*CONFIG_DRM_MSM || CONFIG_DRM_OPLUS_NOTIFY*/
 
 	if (ts->headset_pump_support) {
 		snprintf(name, TP_NAME_SIZE_MAX, "headset_pump%d", ts->tp_index);
@@ -3193,12 +3213,8 @@ error_fb_notif:
 	if (ts->active_panel && ts->notifier_cookie) {
 		panel_event_notifier_unregister(ts->notifier_cookie);
 	}
-#elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
-	mtk_disp_notifier_unregister(&ts->disp_notifier);
 #elif IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 	msm_drm_unregister_client(&ts->fb_notif);
-#elif IS_ENABLED(CONFIG_FB)
-	fb_unregister_client(&ts->fb_notif);
 #endif
 
 err_check_functionality_failed:
@@ -3216,7 +3232,7 @@ EXPORT_SYMBOL(register_common_touch_device);
 void unregister_common_touch_device(struct touchpanel_data *pdata)
 {
 	struct touchpanel_data *ts = pdata;
-#if IS_ENABLED(CONFIG_FB) || IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
+#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 	int ret;
 #endif
 
@@ -3288,10 +3304,6 @@ void unregister_common_touch_device(struct touchpanel_data *pdata)
 	if (ts->active_panel && ts->notifier_cookie) {
 		panel_event_notifier_unregister(ts->notifier_cookie);
 	}
-#elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
-	if (ts->disp_notifier.notifier_call) {
-		mtk_disp_notifier_unregister(&ts->disp_notifier);
-	}
 #elif IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 
 	if (ts->fb_notif.notifier_call) {
@@ -3301,18 +3313,7 @@ void unregister_common_touch_device(struct touchpanel_data *pdata)
 			TP_INFO(ts->tp_index, "Unable to register fb_notifier: %d\n", ret);
 		}
 	}
-
-#elif IS_ENABLED(CONFIG_FB)
-
-	if (ts->fb_notif.notifier_call) {
-		ret = fb_unregister_client(&ts->fb_notif);
-
-		if (ret) {
-			TP_INFO(ts->tp_index, "Unable to unregister fb_notifier: %d\n", ret);
-		}
-	}
-
-#endif/*CONFIG_FB*/
+#endif/*CONFIG_DRM_MSM || CONFIG_DRM_OPLUS_NOTIFY*/
 
 	/*free regulator*/
 	if (!IS_ERR_OR_NULL(ts->hw_res.avdd)) {
@@ -3616,11 +3617,9 @@ EXIT:
 	mutex_unlock(&ts->mutex);
 }
 
-#if IS_ENABLED(CONFIG_FB) || \
-	IS_ENABLED(CONFIG_DRM_MSM) || \
+#if IS_ENABLED(CONFIG_DRM_MSM) || \
 	IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY) || \
-	IS_ENABLED(CONFIG_DRM_PANEL_NOTIFY) || \
-	IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
+	IS_ENABLED(CONFIG_DRM_PANEL_NOTIFY)
 static void lcd_off_early_event(struct touchpanel_data *ts)
 {
 	ts->suspend_state = TP_SUSPEND_EARLY_EVENT;      /*set suspend_resume_state*/
@@ -3665,11 +3664,7 @@ static void lcd_on_early_event(struct touchpanel_data *ts)
 
 static void lcd_on_event(struct touchpanel_data *ts)
 {
-	if (ts->tp_resume_order == TP_LCD_RESUME) {
-#ifdef CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY
-		tp_resume(ts->dev);
-#endif
-	} else if (ts->tp_resume_order == LCD_TP_RESUME) {
+	if (ts->tp_resume_order == LCD_TP_RESUME) {
 		tp_resume(ts->dev);
 		if (!(ts->tp_ic_type == TYPE_TDDI_TCM && ts->is_noflash_ic)) {
 			enable_irq(ts->irq);
@@ -3754,116 +3749,48 @@ static void ts_panel_notifier_callback(enum panel_event_notifier_tag tag,
 	}
 }
 
-#elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY)
-static int ts_mtk_drm_notifier_callback(struct notifier_block *nb,
-	unsigned long event, void *data)
-{
-	struct touchpanel_data *ts = container_of(nb, struct touchpanel_data,
-		disp_notifier);
-	int *blank = (int *)data;
-
-	TP_INFO(ts->tp_index, "mtk gki notifier event:%d, blank:%d",
-			event, *blank);
-
-	switch (event) {
-	case MTK_DISP_EARLY_EVENT_BLANK:
-		if (*blank == MTK_DISP_BLANK_UNBLANK) {
-			lcd_on_early_event(ts);
-		} else if (*blank == MTK_DISP_BLANK_POWERDOWN) {
-			if (ts->speedup_resume_wq) {
-				flush_workqueue(ts->speedup_resume_wq);		/*wait speedup_resume_wq done*/
-			}
-			lcd_off_early_event(ts);
-		}
-	break;
-	case MTK_DISP_EVENT_BLANK:
-		if (*blank == MTK_DISP_BLANK_UNBLANK) {
-			lcd_on_event(ts);
-		} else if (*blank == MTK_DISP_BLANK_POWERDOWN) {
-			lcd_off_event(ts);
-		}
-	break;
-	default:
-		TP_INFO(ts->tp_index, "nuknown event :%d\n", event);
-		lcd_other_event(blank, ts);
-	break;
-	}
-
-	return 0;
-}
-
 #else
 static int fb_notifier_callback(struct notifier_block *self, unsigned long event, void *data)
 {
 	int *blank;
-#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 	struct msm_drm_notifier *evdata = data;
-#else
-	struct fb_event *evdata = data;
-#endif
 
 	struct touchpanel_data *ts = container_of(self, struct touchpanel_data,
 				     fb_notif);
 
 	/*to aviod some kernel bug (at fbmem.c some local veriable are not initialized)*/
-#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 	if (event != MSM_DRM_EARLY_EVENT_BLANK && event != MSM_DRM_EVENT_BLANK
 	    && event != MSM_DRM_EVENT_FOR_TOUCH)
-#else
-	if (event != FB_EARLY_EVENT_BLANK && event != FB_EVENT_BLANK
-	    && event != FB_EVENT_BLANK_FOR_TOUCH)
-#endif
 		return 0;
 
 	if (evdata && evdata->data && ts && ts->chip_data) {
 		blank = evdata->data;
 		TP_INFO(ts->tp_index, "%s: event = %ld, blank = %d\n", __func__, event, *blank);
-#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 
-		if (*blank == MSM_DRM_BLANK_POWERDOWN) { /*suspend*/
-			if (event == MSM_DRM_EARLY_EVENT_BLANK) {    /*early event*/
-#else
-		if (*blank == FB_BLANK_POWERDOWN) { /*suspend*/
-			if (event == FB_EARLY_EVENT_BLANK) {    /*early event*/
-#endif
-				if (ts->speedup_resume_wq) {
-					flush_workqueue(ts->speedup_resume_wq);        /*wait speedup_resume_wq done*/
+		switch(event) {
+			case MSM_DRM_EARLY_EVENT_BLANK:
+				if (*blank == MSM_DRM_BLANK_POWERDOWN) {
+					if (ts->speedup_resume_wq) {
+						flush_workqueue(ts->speedup_resume_wq);  /* wait speedup_resume_wq done */
+					}
+					lcd_off_early_event(ts);
+				} else if (*blank == MSM_DRM_BLANK_UNBLANK) {
+					lcd_on_early_event(ts);
 				}
-
-				lcd_off_early_event(ts);
-#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
-
-			} else if (event == MSM_DRM_EVENT_BLANK) {   /*event*/
-#else
-			} else if (event == FB_EVENT_BLANK) {   /*event*/
-#endif
-				lcd_off_event(ts);
-			}
-
-#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
-
-		} else if (*blank == MSM_DRM_BLANK_UNBLANK) { /*resume*/
-			if (event == MSM_DRM_EARLY_EVENT_BLANK) {    /*early event*/
-#else
-		} else if (*blank == FB_BLANK_UNBLANK) {  /*resume*/
-			if (event == FB_EARLY_EVENT_BLANK) {    /*early event*/
-#endif
-				lcd_on_early_event(ts);
-
-#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
-
-			} else if (event == MSM_DRM_EVENT_BLANK) {   /*event*/
-#else
-			} else if (event == FB_EVENT_BLANK) {   /*event*/
-#endif
-				lcd_on_event(ts);
-			}
-#if IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
-		} else if (event == MSM_DRM_EVENT_FOR_TOUCH) {   //event
-#else
-		} else if (event == FB_EVENT_BLANK_FOR_TOUCH) {   //event
-#endif
-			lcd_other_event(blank, ts);
+				break;
+			case MSM_DRM_EVENT_BLANK:
+				if (*blank == MSM_DRM_BLANK_POWERDOWN) {
+					lcd_off_event(ts);
+				} else if (*blank == MSM_DRM_BLANK_UNBLANK) {
+						lcd_on_event(ts);
+				}
+				break;
+			case MSM_DRM_EVENT_FOR_TOUCH:
+				lcd_other_event(blank, ts);
+				break;
+			default:
+				lcd_other_event(blank, ts);
+				break;
 		}
 	}
 
@@ -3883,13 +3810,6 @@ void tp_shutdown(struct touchpanel_data *ts)
 	if (!ts) {
 		return;
 	}
-
-#ifdef CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY
-	TPD_INFO("mtk gki2.0 need to unregister notifier");
-	if (mtk_disp_notifier_unregister(&ts->disp_notifier)) {
-			TP_INFO(ts->tp_index, "Failed to unregister mtk gki 2.0 disp notifier!!\n");
-	}
-#endif
 
 	/*step0 :close esd*/
 	if (ts->esd_handle_support) {

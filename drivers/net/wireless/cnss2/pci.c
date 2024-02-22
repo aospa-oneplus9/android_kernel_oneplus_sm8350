@@ -2571,7 +2571,8 @@ static int cnss_qca6290_powerup(struct cnss_pci_data *pci_priv)
 	int ret = 0;
 	struct cnss_plat_data *plat_priv = pci_priv->plat_priv;
 	unsigned int timeout;
-	int retry = 0, sw_ctrl_gpio = plat_priv->pinctrl_info.sw_ctrl_gpio;
+	int retry = 0;
+	int __maybe_unused sw_ctrl_gpio = plat_priv->pinctrl_info.sw_ctrl_gpio;
 
 	if (plat_priv->ramdump_info_v2.dump_data_valid) {
 		cnss_pci_clear_dump_info(pci_priv);
@@ -3409,7 +3410,7 @@ out:
 	return ret;
 }
 
-static int cnss_pci_suspend_noirq(struct device *dev)
+static int cnss_pci_suspend_late(struct device *dev)
 {
 	int ret = 0;
 	struct pci_dev *pci_dev = to_pci_dev(dev);
@@ -3423,8 +3424,8 @@ static int cnss_pci_suspend_noirq(struct device *dev)
 		goto out;
 
 	driver_ops = pci_priv->driver_ops;
-	if (driver_ops && driver_ops->suspend_noirq)
-		ret = driver_ops->suspend_noirq(pci_dev);
+	if (driver_ops && driver_ops->suspend_late)
+		ret = driver_ops->suspend_late(pci_dev);
 
 	if (pci_priv->disable_pc && !pci_dev->state_saved &&
 	    !pci_priv->plat_priv->use_pm_domain)
@@ -3434,7 +3435,7 @@ out:
 	return ret;
 }
 
-static int cnss_pci_resume_noirq(struct device *dev)
+static int cnss_pci_resume_late(struct device *dev)
 {
 	int ret = 0;
 	struct pci_dev *pci_dev = to_pci_dev(dev);
@@ -3448,9 +3449,9 @@ static int cnss_pci_resume_noirq(struct device *dev)
 		goto out;
 
 	driver_ops = pci_priv->driver_ops;
-	if (driver_ops && driver_ops->resume_noirq &&
+	if (driver_ops && driver_ops->resume_late &&
 	    !pci_priv->pci_link_down_ind)
-		ret = driver_ops->resume_noirq(pci_dev);
+		ret = driver_ops->resume_late(pci_dev);
 
 out:
 	return ret;
@@ -5399,7 +5400,7 @@ static int cnss_pci_update_fw_name(struct cnss_pci_data *pci_priv)
 	return 0;
 }
 
-static char *cnss_mhi_notify_status_to_str(enum MHI_CB status)
+static __maybe_unused char *cnss_mhi_notify_status_to_str(enum MHI_CB status)
 {
 	switch (status) {
 	case MHI_CB_IDLE:
@@ -5928,8 +5929,8 @@ static int cnss_pci_of_reserved_mem_device_init(struct cnss_pci_data *pci_priv)
 static struct dev_pm_domain cnss_pm_domain = {
 	.ops = {
 		SET_SYSTEM_SLEEP_PM_OPS(cnss_pci_suspend, cnss_pci_resume)
-		SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(cnss_pci_suspend_noirq,
-					      cnss_pci_resume_noirq)
+		SET_LATE_SYSTEM_SLEEP_PM_OPS(cnss_pci_suspend_late,
+					      cnss_pci_resume_late)
 		SET_RUNTIME_PM_OPS(cnss_pci_runtime_suspend,
 				   cnss_pci_runtime_resume,
 				   cnss_pci_runtime_idle)
@@ -6169,8 +6170,8 @@ MODULE_DEVICE_TABLE(pci, cnss_pci_id_table);
 
 static const struct dev_pm_ops cnss_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(cnss_pci_suspend, cnss_pci_resume)
-	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(cnss_pci_suspend_noirq,
-				      cnss_pci_resume_noirq)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(cnss_pci_suspend_late,
+				      cnss_pci_resume_late)
 	SET_RUNTIME_PM_OPS(cnss_pci_runtime_suspend, cnss_pci_runtime_resume,
 			   cnss_pci_runtime_idle)
 };

@@ -34,20 +34,11 @@
 	#size-cells = <2>;
 
 	chosen {
-		bootargs = "log_buf_len=256K earlycon=msm_geni_serial,0x98c000 rcupdate.rcu_expedited=1 rcu_nocbs=0-7 kpti=off";
+		bootargs = "log_buf_len=256K earlycon=msm_geni_serial,0x98c000 rcupdate.rcu_expedited=1 rcu_nocbs=0-7 kpti=off noirqdebug";
 	};
 
 	memory { device_type = "memory"; reg = <0 0 0 0>; };
 	reserved_memory: reserved-memory { };
-
-	mem-offline {
-		compatible = "qcom,mem-offline";
-		offline-sizes = <0x1 0x40000000 0x0 0x40000000>,
-				<0x1 0xc0000000 0x0 0x80000000>,
-				<0x2 0xc0000000 0x1 0x40000000>;
-		granule = <512>;
-		mboxes = <&qmp_aop 0>;
-	};
 
 	aliases {
 		ufshc1 = &ufshc_mem; /* Embedded UFS Slot */
@@ -76,8 +67,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 0 4>;
-			capacity-dmips-mhz = <1024>;
-			dynamic-power-coefficient = <100>;
+			capacity-dmips-mhz = <409>;
+			dynamic-power-coefficient = <264>;
 			cpu-idle-states = <&SLVR_RAIL_OFF>;
 			next-level-cache = <&L2_0>;
 			#cooling-cells = <2>;
@@ -100,8 +91,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 0 4>;
-			capacity-dmips-mhz = <1024>;
-			dynamic-power-coefficient = <100>;
+			capacity-dmips-mhz = <409>;
+			dynamic-power-coefficient = <264>;
 			cpu-idle-states = <&SLVR_RAIL_OFF>;
 			next-level-cache = <&L2_1>;
 			#cooling-cells = <2>;
@@ -119,8 +110,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 0 4>;
-			capacity-dmips-mhz = <1024>;
-			dynamic-power-coefficient = <100>;
+			capacity-dmips-mhz = <409>;
+			dynamic-power-coefficient = <264>;
 			cpu-idle-states = <&SLVR_RAIL_OFF>;
 			next-level-cache = <&L2_2>;
 			#cooling-cells = <2>;
@@ -138,8 +129,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 0 4>;
-			capacity-dmips-mhz = <1024>;
-			dynamic-power-coefficient = <100>;
+			capacity-dmips-mhz = <409>;
+			dynamic-power-coefficient = <264>;
 			cpu-idle-states = <&SLVR_RAIL_OFF>;
 			next-level-cache = <&L2_3>;
 			#cooling-cells = <2>;
@@ -157,8 +148,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 1 4>;
-			capacity-dmips-mhz = <1946>;
-			dynamic-power-coefficient = <515>;
+			capacity-dmips-mhz = <1004>;
+			dynamic-power-coefficient = <362>;
 			cpu-idle-states = <&GOLD_RAIL_OFF>;
 			next-level-cache = <&L2_4>;
 			#cooling-cells = <2>;
@@ -176,8 +167,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 1 4>;
-			capacity-dmips-mhz = <1946>;
-			dynamic-power-coefficient = <515>;
+			capacity-dmips-mhz = <1004>;
+			dynamic-power-coefficient = <362>;
 			cpu-idle-states = <&GOLD_RAIL_OFF>;
 			next-level-cache = <&L2_5>;
 			#cooling-cells = <2>;
@@ -195,8 +186,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 1 4>;
-			capacity-dmips-mhz = <1946>;
-			dynamic-power-coefficient = <515>;
+			capacity-dmips-mhz = <1004>;
+			dynamic-power-coefficient = <362>;
 			cpu-idle-states = <&GOLD_RAIL_OFF>;
 			next-level-cache = <&L2_6>;
 			#cooling-cells = <2>;
@@ -214,8 +205,8 @@
 			enable-method = "psci";
 			cpu-release-addr = <0x0 0x90000000>;
 			qcom,freq-domain = <&cpufreq_hw 2 4>;
-			capacity-dmips-mhz = <2048>;
-			dynamic-power-coefficient = <845>;
+			capacity-dmips-mhz = <1024>;
+			dynamic-power-coefficient = <553>;
 			cpu-idle-states = <&GOLD_RAIL_OFF>;
 			next-level-cache = <&L2_7>;
 			#cooling-cells = <2>;
@@ -292,7 +283,7 @@
 				dev = "/dev/block/platform/soc/1d84000.ufshc/by-name/vendor";
 				type = "ext4";
 				mnt_flags = "ro,barrier=1,discard";
-				fsmgr_flags = "wait,slotselect,avb";
+				fsmgr_flags = "wait,slotselect";
 				status = "ok";
 			};
 		};
@@ -544,11 +535,13 @@
 	demura_memory_0: demura_region_0 {
 		reg = <0x0 0x0 0x0 0x0>;
 		label = "demura hfc region 0";
+		status = "disabled";
 	};
 
 	demura_memory_1: demura_region_1 {
 		reg = <0x0 0x0 0x0 0x0>;
 		label = "demura hfc region 1";
+		status = "disabled";
 	};
 
 	dfps_data_memory: dfps_data_region {
@@ -567,14 +560,6 @@
 		alloc-ranges = <0x0 0x00000000 0x0 0xdfffffff>;
 		alignment = <0x0 0x100000>;
 		size = <0x0 0x800000>;
-	};
-
-	non_secure_display_memory: non_secure_display_region {
-		compatible = "shared-dma-pool";
-		alloc-ranges = <0x0 0x00000000 0x0 0xffffffff>;
-		reusable;
-		alignment = <0x0 0x400000>;
-		size = <0x0 0x6400000>;
 	};
 };
 
@@ -2267,6 +2252,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU0>;
+		status = "disabled";
 	};
 
 	jtag_mm1: jtagmm@7140000 {
@@ -2278,6 +2264,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU1>;
+		status = "disabled";
 	};
 
 	jtag_mm2: jtagmm@7240000 {
@@ -2289,6 +2276,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU2>;
+		status = "disabled";
 	};
 
 	jtag_mm3: jtagmm@7340000 {
@@ -2300,6 +2288,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU3>;
+		status = "disabled";
 	};
 
 	jtag_mm4: jtagmm@7440000 {
@@ -2311,6 +2300,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU4>;
+		status = "disabled";
 	};
 
 	jtag_mm5: jtagmm@7540000 {
@@ -2322,6 +2312,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU5>;
+		status = "disabled";
 	};
 
 	jtag_mm6: jtagmm@7640000 {
@@ -2333,6 +2324,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU6>;
+		status = "disabled";
 	};
 
 	jtag_mm7: jtagmm@7740000 {
@@ -2344,6 +2336,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU7>;
+		status = "disabled";
 	};
 
 	qcom,memshare {
@@ -2969,6 +2962,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU0>;
+		status = "disabled";
 	};
 
 	jtag_mm1: jtagmm@7140000 {
@@ -2980,6 +2974,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU1>;
+		status = "disabled";
 	};
 
 	jtag_mm2: jtagmm@7240000 {
@@ -2991,6 +2986,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU2>;
+		status = "disabled";
 	};
 
 	jtag_mm3: jtagmm@7340000 {
@@ -3002,6 +2998,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU3>;
+		status = "disabled";
 	};
 
 	jtag_mm4: jtagmm@7440000 {
@@ -3013,6 +3010,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU4>;
+		status = "disabled";
 	};
 
 	jtag_mm5: jtagmm@7540000 {
@@ -3024,6 +3022,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU5>;
+		status = "disabled";
 	};
 
 	jtag_mm6: jtagmm@7640000 {
@@ -3035,6 +3034,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU6>;
+		status = "disabled";
 	};
 
 	jtag_mm7: jtagmm@7740000 {
@@ -3046,6 +3046,7 @@
 		clock-names = "core_clk";
 
 		qcom,coresight-jtagmm-cpu = <&CPU7>;
+		status = "disabled";
 	};
 
 	qcom,rmtfs_sharedmem@0 {
@@ -4379,6 +4380,7 @@
 					compatible = "qcom,msm-cdsp-rm";
 					qcom,qos-latency-us = <70>;
 					qcom,qos-maxhold-ms = <20>;
+					qcom,qos-cores = <0 1 2 3>;
 				};
 			};
 		};

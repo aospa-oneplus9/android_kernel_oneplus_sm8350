@@ -149,7 +149,7 @@
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
-#elif IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
+#elif IS_ENABLED(CONFIG_QCOM_KGSL) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 #include <linux/msm_drm_notify.h>
 #elif IS_ENABLED(CONFIG_FB)
 #include <linux/notifier.h>
@@ -343,8 +343,13 @@ static inline void getnstimeofday(struct timespec *ts)
 #define chg_debug(fmt, ...) \
         printk(KERN_NOTICE "[OPLUS_CHG][%s]"fmt, __func__, ##__VA_ARGS__)
 
+#ifdef DEBUG
 #define chg_err(fmt, ...) \
         printk(KERN_ERR "[OPLUS_CHG][%s]"fmt, __func__, ##__VA_ARGS__)
+#else
+#define chg_err(fmt, ...) \
+        no_printk(KERN_ERR "[OPLUS_CHG][%s]"fmt, __func__, ##__VA_ARGS__)
+#endif
 
 enum {
 	PD_INACTIVE = 0,
@@ -1018,7 +1023,7 @@ struct oplus_chg_chip {
 	bool fg_bcl_poll;
 	bool chg_powersave;
 	bool healthd_ready;
-#if IS_ENABLED(CONFIG_FB) || IS_ENABLED(CONFIG_DRM_MSM) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
+#if IS_ENABLED(CONFIG_FB) || IS_ENABLED(CONFIG_QCOM_KGSL) || IS_ENABLED(CONFIG_DRM_OPLUS_NOTIFY)
 	struct notifier_block chg_fb_notify;
 #elif IS_ENABLED(CONFIG_OPLUS_MTK_DRM_GKI_NOTIFY_CHG)
 	struct notifier_block chg_fb_notify;
